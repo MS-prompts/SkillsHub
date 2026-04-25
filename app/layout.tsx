@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
+import 'highlight.js/styles/github.css'
+import { TopBar } from '@/components/TopBar'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -15,8 +17,11 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <body className={inter.className}>
+        <TopBar />
+        <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
+      </body>
     </html>
   )
 }

@@ -283,7 +283,7 @@ CREATE INDEX idx_teams_company_id              ON teams(company_id);
 CREATE INDEX idx_team_members_team_id          ON team_members(team_id);
 CREATE INDEX idx_team_members_user_id          ON team_members(user_id);
 CREATE INDEX idx_markdown_files_team_id        ON markdown_files(team_id);
-CREATE INDEX idx_markdown_files_author_id      ON markdown_files(author_id);
+CREATE INDEX idx_markdown_files_author_id       ON markdown_files(author_id);
 CREATE INDEX idx_markdown_files_tags           ON markdown_files USING GIN(tags);
 CREATE INDEX idx_md_team_visibility_md_id      ON md_team_visibility(md_id);
 CREATE INDEX idx_md_team_visibility_team_id    ON md_team_visibility(team_id);

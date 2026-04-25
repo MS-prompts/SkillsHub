@@ -63,15 +63,16 @@ RETURNS BOOLEAN AS $$
 $$ LANGUAGE SQL SECURITY DEFINER STABLE;
 
 -- Centralized "can the current user view this MD?" check.
--- True if the owning team is mine, OR the MD is shared into one of
--- my teams via md_team_visibility, OR it was direct-shared to me.
+-- True if admin, OR owning team member, OR MD shared into one of
+-- my teams via md_team_visibility, OR direct-shared to me.
 CREATE OR REPLACE FUNCTION can_view_md(md UUID)
 RETURNS BOOLEAN AS $$
   SELECT EXISTS (
     SELECT 1 FROM markdown_files m
     WHERE m.id = md
       AND (
-        EXISTS (
+        is_company_admin()
+        OR EXISTS (
           SELECT 1 FROM team_members tm
           WHERE tm.team_id = m.team_id AND tm.user_id = auth.uid()
         )
@@ -187,11 +188,11 @@ CREATE POLICY "view_accessible_mds"
 ON markdown_files FOR SELECT
 USING (can_view_md(id));
 
--- Members of a team can author MDs into their team's feed.
+-- Members of a team can author MDs into their team's feed. Admins can write to any team.
 CREATE POLICY "member_create_md"
 ON markdown_files FOR INSERT
 WITH CHECK (
-  is_team_member(team_id)
+  (is_team_member(team_id) OR is_company_admin())
   AND author_id = auth.uid()
 );
 
