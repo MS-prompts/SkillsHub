@@ -275,8 +275,8 @@ USING (is_team_lead(to_team_id));
 CREATE POLICY "member_create_cross_team_request"
 ON cross_team_requests FOR INSERT
 WITH CHECK (
-  is_team_member(from_team_id)
-  AND requested_by = auth.uid()
+  requested_by = auth.uid()
+  AND can_view_md(md_id)
   AND to_team_id IN (
     SELECT id FROM teams WHERE company_id = my_company_id()
   )

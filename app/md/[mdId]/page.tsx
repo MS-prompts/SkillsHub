@@ -131,15 +131,15 @@ export default async function MDViewPage({ params }: { params: { mdId: string } 
           .order('display_name')
       : { data: [] as any[] }
 
-  const { data: myTeams } = await supabase
-    .from('team_members')
-    .select('team:teams(id, name)')
-    .eq('user_id', user.id)
-  const myTeamList = ((myTeams ?? []).map((m) => (m as any).team).filter(Boolean) as Array<{
-    id: string
-    name: string
-  }>)
-  const otherTeams = myTeamList.filter((t) => t.id !== md.team_id)
+  const { data: companyTeams } = profile?.company_id
+    ? await supabase
+        .from('teams')
+        .select('id, name')
+        .eq('company_id', profile.company_id)
+        .neq('id', md.team_id)
+        .order('name')
+    : { data: [] as Array<{ id: string; name: string }> }
+  const otherTeams = (companyTeams ?? []) as Array<{ id: string; name: string }>
 
   const visibility = (md.visibility ?? []) as unknown as Array<{
     team: { id: string; name: string } | null
