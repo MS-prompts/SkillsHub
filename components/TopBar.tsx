@@ -1,9 +1,8 @@
 import Link from 'next/link'
-import { LayoutGrid, Inbox, Users, LogOut, BookOpen, Shield } from 'lucide-react'
+import { LogOut, BookOpen } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { signOut } from '@/app/auth/actions'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { TopBarNav } from '@/components/TopBarNav'
 
 async function getInboxCount(userId: string): Promise<number> {
   const supabase = createClient()
@@ -60,41 +60,7 @@ export async function TopBar() {
             <BookOpen className="h-5 w-5" />
             SkillsHub
           </Link>
-          {user && (
-            <nav className="hidden items-center gap-1 md:flex">
-              <Button asChild variant="ghost" size="sm">
-                <Link href="/dashboard">
-                  <LayoutGrid className="mr-2 h-4 w-4" />
-                  Dashboard
-                </Link>
-              </Button>
-              <Button asChild variant="ghost" size="sm">
-                <Link href="/teams">
-                  <Users className="mr-2 h-4 w-4" />
-                  Teams
-                </Link>
-              </Button>
-              <Button asChild variant="ghost" size="sm">
-                <Link href="/inbox" className="relative">
-                  <Inbox className="mr-2 h-4 w-4" />
-                  Inbox
-                  {inboxCount > 0 && (
-                    <Badge variant="destructive" className="ml-2 h-5 px-1.5">
-                      {inboxCount}
-                    </Badge>
-                  )}
-                </Link>
-              </Button>
-              {isAdmin && (
-                <Button asChild variant="ghost" size="sm">
-                  <Link href="/admin">
-                    <Shield className="mr-2 h-4 w-4" />
-                    Admin
-                  </Link>
-                </Button>
-              )}
-            </nav>
-          )}
+          {user && <TopBarNav inboxCount={inboxCount} isAdmin={isAdmin} />}
         </div>
 
         {user ? (
