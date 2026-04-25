@@ -11,6 +11,7 @@ export interface MDCardData {
   title: string
   readme: string | null
   tags: MDTag[]
+  team_name?: string | null
   updated_at: string
   author: { id: string; display_name: string } | null
   authorGrade?: { coworker_grade: number; total_ratings: number } | null
@@ -42,6 +43,11 @@ export function MDCard({ md }: { md: MDCardData }) {
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
+            {md.team_name && (
+              <span className="rounded-full border bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
+                {md.team_name}
+              </span>
+            )}
             {md.tags.map((t) => (
               <TagPill key={t} tag={t} />
             ))}

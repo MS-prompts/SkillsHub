@@ -32,14 +32,16 @@ export default async function DashboardPage() {
       .map((m) => (m as any).team)
       .filter((t: any): t is { id: string; name: string; description: string | null } => !!t) ?? []
   const teamIds = myTeams.map((t) => t.id)
+  const teamNameById = new Map(myTeams.map((t) => [t.id, t.name]))
 
   let recent: MDCardData[] = []
   if (teamIds.length > 0) {
     const { data: mds } = await supabase
       .from('markdown_files')
       .select(
-        `id, title, readme, tags, updated_at, author_id,
-         author:profiles(id, display_name)`
+        `id, team_id, title, readme, tags, updated_at, author_id,
+         author:profiles(id, display_name),
+         team:teams(name)`
       )
       .in('team_id', teamIds)
       .order('updated_at', { ascending: false })
@@ -77,6 +79,7 @@ export default async function DashboardPage() {
       title: m.title,
       readme: m.readme,
       tags: m.tags as MDTag[],
+      team_name: m.team?.name ?? teamNameById.get(m.team_id) ?? null,
       updated_at: m.updated_at,
       author: m.author ? { id: m.author.id, display_name: m.author.display_name } : null,
       authorGrade: m.author_id ? gradeMap.get(m.author_id) ?? null : null,
