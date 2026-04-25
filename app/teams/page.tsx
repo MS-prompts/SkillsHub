@@ -32,6 +32,13 @@ export default async function TeamsPage() {
     .eq('status', 'pending')
   const pendingTeamIds = new Set((pendingReqs ?? []).map((r) => r.team_id))
 
+  const sortedTeams = [...(teams ?? [])].sort((a, b) => {
+    const aMember = memberTeamIds.has(a.id) ? 1 : 0
+    const bMember = memberTeamIds.has(b.id) ? 1 : 0
+    if (aMember !== bMember) return bMember - aMember
+    return String(a.name).localeCompare(String(b.name))
+  })
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -41,7 +48,7 @@ export default async function TeamsPage() {
         </div>
       </div>
 
-      {(!teams || teams.length === 0) ? (
+      {sortedTeams.length === 0 ? (
         <Card>
           <CardContent className="p-6 text-sm text-muted-foreground">
             No teams in your company yet. An admin needs to create one.
@@ -49,7 +56,7 @@ export default async function TeamsPage() {
         </Card>
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
-          {teams.map((t: any) => (
+          {sortedTeams.map((t: any) => (
             <Card key={t.id}>
               <CardHeader>
                 <div className="flex items-start justify-between gap-3">
