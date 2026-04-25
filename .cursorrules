@@ -1,0 +1,621 @@
+# SkillsHub — Cursor Rules
+# Read this entire file before writing any code.
+
+## What This App Is
+
+SkillsHub is a markdown sharing platform for companies and teams.
+Users share AI agent markdowns — skills, rules, prompts, SOPs — within their
+company, with team-scoped feeds, cross-team approval flows, direct shares,
+and per-MD ratings that aggregate into a per-author "Coworker Grade".
+
+Built with Next.js (frontend) + Supabase (backend, auth, database).
+Hackathon scope: functional first; deployment is optional (local `next dev`
+is sufficient for the demo).
+
+---
+
+## Stack
+
+- **Frontend**: Next.js 14+ App Router, TypeScript, Tailwind CSS
+- **UI components**: shadcn/ui (initialized with `npx shadcn-ui@latest init`)
+- **Icons**: lucide-react
+- **Forms / validation**: zod (used inside server actions)
+- **Backend**: Supabase (Postgres + RLS + Auth)
+- **Markdown**: react-markdown + remark-gfm + DOMPurify (XSS sanitization)
+- **Markdown styling**: `@tailwindcss/typography` (`prose` classes)
+- **Auth**: Supabase Auth, email + password
+- **Storage**: NONE — markdown content lives in `markdown_files.content` (TEXT). Do NOT use Supabase Storage.
+- **Realtime**: NOT used in v1. Refetch on focus / after mutation.
+- **Deployment**: Local `next dev` only for the hackathon.
+
+---
+
+## UI Direction
+
+Original branding, GitHub-inspired layout for markdown screens. Clean,
+minimal, dense enough to feel professional. Use shadcn/ui primitives
+everywhere; don't hand-roll buttons/inputs.
+
+### Composer (write a new MD or edit an existing one)
+GitHub-style **Write / Preview tab toggle** (use shadcn `Tabs`):
+- Above the tabs: title input, README input (1-3 lines), tag multi-select
+- "Write" tab: a `<textarea>` for the markdown body (monospace font,
+  min-height ~400px, full available width)
+- "Preview" tab: live rendered preview using the same `MDViewer` component
+  (so the viewer and preview look identical)
+- Below the tabs: "Save" + "Save & request share to another team" actions
+- Show the team this will be saved into; if the user is in only one team,
+  default to it; otherwise let them pick
+
+### Viewer (click an MD to read it — `/md/[mdId]`)
+GitHub-style file view. Two-column layout:
+- **Header bar**: title, tag pills, author avatar + name + Coworker Grade
+  badge, last-updated timestamp, "Share" button, "Edit" button (visible to
+  author or owning-team lead)
+- **Main panel (left, takes most of the width)**: rendered markdown body
+  inside a `prose` container. Provide a "Source" toggle that swaps in the
+  raw markdown in a monospace block.
+- **Sidebar (right, ~320px)**:
+  - README (the author's short description)
+  - Owning team
+  - Teams it's shared with (from `md_team_visibility`)
+  - Rating summary (avg stars + count) and a "Rate this" stars input
+    (the input is hidden for the author of the MD — they cannot rate their
+    own MD)
+
+### Team Feed (`/teams/[teamId]`)
+List view of MDs visible to the current user in that team:
+- Card per MD: title, tag pills, author with grade, snippet of README,
+  rating average, last-updated timestamp
+- Top filter bar: tag filter, author filter, sort (recent / top-rated)
+- Prominent "Share new MD" CTA → `/teams/[teamId]/compose`
+
+### Dashboard (`/dashboard`)
+Landing after login:
+- "My teams" list (with quick links into each)
+- "Recent across my teams" feed
+- "Pending in my inbox" badge → `/inbox`
+
+### Inbox (`/inbox`)
+Two sections:
+- Direct shares (MDs sent to you 1:1)
+- Pending approvals — only visible to team leads:
+  - Incoming join requests
+  - Incoming cross-team share requests
+
+### User profile (`/u/[userId]`)
+- Display name, role, Coworker Grade (large), total ratings, MD count
+- List of their MDs you can see
+
+---
+
+## Database Schema Reference
+
+Read `schema.sql` for the canonical schema. Summary:
+
+```
+companies           id, name, slug (citext, derived from email domain), created_at
+profiles            id (= auth.uid()), company_id, display_name, role, created_at
+teams               id, company_id, name, description, lead_id, created_at
+team_members        id, team_id, user_id, joined_at
+markdown_files      id, team_id, author_id, title, readme, content (TEXT), tags, created_at, updated_at
+md_team_visibility  id, md_id, team_id, granted_at      -- cross-team read access
+join_requests       id, team_id, user_id, status, message, resolved_at, created_at
+cross_team_requests id, md_id, from_team_id, to_team_id, requested_by, status, resolved_at, created_at
+direct_shares       id, md_id, sender_id, recipient_id, message, seen, created_at
+md_feedback         id, md_id, user_id, stars (1-5), comment, created_at
+
+VIEW md_rating_summary  md_id, avg_stars, rating_count
+VIEW user_grades        user_id, display_name, company_id, coworker_grade, total_ratings, md_count
+```
+
+### Enums
+```
+user_role:       'member' | 'lead' | 'admin'
+md_tag:          'skill' | 'rule' | 'prompt' | 'sop' | 'other'
+approval_status: 'pending' | 'approved' | 'rejected'
+```
+
+### Company auto-binding
+On signup, the `handle_new_user()` trigger derives the company slug from
+the user's email domain. The first user from a new domain auto-creates a
+company and is promoted to `admin`; subsequent users from the same domain
+auto-join that company as `member`. This is what enforces the "workers
+locked to the same company ecosystem" requirement — there is no invite
+flow in v1.
+
+### Cross-team sharing model
+An MD always belongs to its owning team (`markdown_files.team_id`). To
+share into another team, a member creates a `cross_team_requests` row.
+When the target team lead approves it, the app inserts a row into
+`md_team_visibility` granting that team read access. The original team's
+ownership never changes. There is no `is_approved` column — visibility
+is purely controlled by `md_team_visibility`.
+
+### Coworker Grade
+Each MD can be rated 1-5 stars by anyone who can see it (except the
+author). The `user_grades` view aggregates a user's average rating
+across all their MDs as `coworker_grade`. Display this prominently on
+the user profile and as a small badge next to the author's name on MD
+cards / viewer header. If the user has no ratings yet, show "—" rather
+than 0.00.
+
+---
+
+## Critical Rules
+
+### Supabase Client Usage
+ALWAYS use the correct Supabase client for the context:
+
+```typescript
+// SERVER components, route handlers, server actions:
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+
+// CLIENT components (with 'use client'):
+import { createBrowserClient } from '@supabase/ssr'
+```
+
+NEVER use the basic `createClient` from `@supabase/supabase-js` in server code.
+NEVER expose the service role key in client-side code.
+NEVER use `supabase.auth.admin` in client-side code.
+
+### Environment Variables
+```
+NEXT_PUBLIC_SUPABASE_URL        ← safe client-side
+NEXT_PUBLIC_SUPABASE_ANON_KEY   ← safe client-side (RLS protects data)
+SUPABASE_SERVICE_ROLE_KEY       ← SERVER ONLY, never in client components
+```
+
+### TypeScript Types
+Always type Supabase responses against `lib/types.ts`. Never use `any`.
+
+### Markdown Security
+ALWAYS sanitize with DOMPurify before rendering. No exceptions.
+
+```typescript
+// components/MDViewer.tsx
+import ReactMarkdown from 'react-markdown'
+import DOMPurify from 'dompurify'
+import remarkGfm from 'remark-gfm'
+
+export function MDViewer({ content }: { content: string }) {
+  const clean = DOMPurify.sanitize(content)
+  return (
+    <div className="prose prose-neutral dark:prose-invert max-w-none">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{clean}</ReactMarkdown>
+    </div>
+  )
+}
+```
+
+The same `MDViewer` is used inside the composer's "Preview" tab and on the
+viewer page, so they always render identically.
+
+---
+
+## Security Model
+
+**Row Level Security (RLS) handles all access control at the database level.**
+You do NOT need permission checks in your API code.
+
+Key rules enforced by RLS (see `rls-policies.sql`):
+- Users only see data from their own company
+- An MD is visible if it's in your team, shared into one of your teams via
+  `md_team_visibility`, or sent directly to you
+  (centralized in the `can_view_md()` SQL helper)
+- Only team leads can approve join requests and cross-team shares
+- Only the target team lead can insert into `md_team_visibility`
+- A user cannot rate their own MDs
+- Helper functions (`is_team_member`, `can_view_md`, etc.) are
+  `SECURITY DEFINER` to avoid recursive-policy bugs
+
+**Never bypass RLS.** Use the service role key only for trusted admin jobs.
+
+---
+
+## Common Supabase Patterns
+
+### Fetch a team's MDs (with author + rating summary)
+```typescript
+const { data } = await supabase
+  .from('markdown_files')
+  .select(`
+    id, title, readme, tags, created_at, updated_at,
+    author:profiles(id, display_name),
+    rating:md_rating_summary(avg_stars, rating_count)
+  `)
+  .eq('team_id', teamId)
+  .order('updated_at', { ascending: false })
+```
+
+### Create a new MD (member shares to their own team)
+```typescript
+const { data, error } = await supabase
+  .from('markdown_files')
+  .insert({
+    team_id: teamId,
+    author_id: userId,
+    title,
+    readme,
+    content,        // raw markdown body
+    tags
+  })
+  .select('id')
+  .single()
+```
+
+### Read an MD for the viewer
+```typescript
+const { data } = await supabase
+  .from('markdown_files')
+  .select(`
+    *,
+    author:profiles(id, display_name),
+    team:teams(id, name),
+    visibility:md_team_visibility(team:teams(id, name)),
+    rating:md_rating_summary(avg_stars, rating_count)
+  `)
+  .eq('id', mdId)
+  .single()
+```
+
+### Submit a join request
+```typescript
+await supabase.from('join_requests').insert({
+  team_id: teamId,
+  user_id: currentUserId,
+  message: optionalMessage
+})
+```
+
+### Approve a join request (team lead only)
+```typescript
+await supabase
+  .from('join_requests')
+  .update({ status: 'approved', resolved_at: new Date().toISOString() })
+  .eq('id', requestId)
+
+await supabase
+  .from('team_members')
+  .insert({ team_id: teamId, user_id: applicantUserId })
+```
+
+### Approve a cross-team share (target team lead only)
+```typescript
+// 1. Mark the request approved
+await supabase
+  .from('cross_team_requests')
+  .update({ status: 'approved', resolved_at: new Date().toISOString() })
+  .eq('id', requestId)
+
+// 2. Grant read access to the target team
+await supabase
+  .from('md_team_visibility')
+  .insert({ md_id: mdId, team_id: targetTeamId })
+```
+
+### Send a direct share
+```typescript
+await supabase.from('direct_shares').insert({
+  md_id: mdId,
+  sender_id: currentUserId,
+  recipient_id: colleagueId,
+  message: optionalNote
+})
+```
+
+### Rate an MD (1-5 stars, idempotent)
+```typescript
+await supabase
+  .from('md_feedback')
+  .upsert(
+    { md_id: mdId, user_id: currentUserId, stars, comment },
+    { onConflict: 'md_id,user_id' }
+  )
+```
+
+### Get an author's Coworker Grade
+```typescript
+const { data } = await supabase
+  .from('user_grades')
+  .select('coworker_grade, total_ratings, md_count')
+  .eq('user_id', authorId)
+  .single()
+```
+
+### Get current user's profile + company
+```typescript
+const { data: { user } } = await supabase.auth.getUser()
+const { data: profile } = await supabase
+  .from('profiles')
+  .select('*, company:companies(id, name, slug)')
+  .eq('id', user!.id)
+  .single()
+```
+
+---
+
+## Next.js App Router Patterns
+
+### Server Component (default — for data fetching)
+```typescript
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+
+export default async function TeamPage({ params }: { params: { teamId: string } }) {
+  const cookieStore = cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: cookieStore.get.bind(cookieStore) } }
+  )
+
+  const { data: files } = await supabase
+    .from('markdown_files')
+    .select('*')
+    .eq('team_id', params.teamId)
+
+  return <TeamFeed files={files ?? []} />
+}
+```
+
+### Client Component (only when interactive)
+Used for: composer Write/Preview toggle, rating widget, share dialogs,
+optimistic UI.
+
+### Server Action (for mutations / form submits)
+```typescript
+'use server'
+import { z } from 'zod'
+
+const ShareMDSchema = z.object({
+  team_id: z.string().uuid(),
+  title:   z.string().min(1).max(200),
+  readme:  z.string().max(2000).optional(),
+  content: z.string().min(1),
+  tags:    z.array(z.enum(['skill','rule','prompt','sop','other']))
+})
+
+export async function shareMD(formData: FormData) {
+  const parsed = ShareMDSchema.parse(Object.fromEntries(formData))
+  // ... insert, RLS enforces team membership and authorship
+}
+```
+
+---
+
+## File Structure
+
+```
+SkillsHub/
+├── .cursorrules
+├── schema.sql                    ← database schema
+├── rls-policies.sql              ← security policies
+├── package.json
+├── .env.local                    ← never commit
+├── components.json               ← shadcn/ui config
+├── tailwind.config.ts            ← include @tailwindcss/typography
+├── app/
+│   ├── layout.tsx                ← root with topbar + (auth) sidebar
+│   ├── page.tsx                  ← landing → redirects to /dashboard if signed in
+│   ├── auth/
+│   │   ├── login/page.tsx
+│   │   ├── signup/page.tsx
+│   │   └── callback/route.ts
+│   ├── dashboard/page.tsx        ← my teams + recent MDs
+│   ├── teams/
+│   │   ├── page.tsx              ← all company teams (browse + request to join)
+│   │   └── [teamId]/
+│   │       ├── page.tsx          ← team MD feed
+│   │       ├── compose/page.tsx  ← MD composer (write/preview tabs)
+│   │       └── settings/page.tsx ← team lead controls
+│   ├── md/
+│   │   └── [mdId]/
+│   │       ├── page.tsx          ← MD viewer (GitHub-style)
+│   │       └── edit/page.tsx     ← edit existing MD
+│   ├── inbox/page.tsx            ← direct shares + (lead) pending approvals
+│   └── u/[userId]/page.tsx       ← user profile + Coworker Grade + their MDs
+├── components/
+│   ├── ui/                       ← shadcn primitives (Button, Tabs, Dialog, ...)
+│   ├── MDViewer.tsx              ← react-markdown + DOMPurify (used in viewer & preview)
+│   ├── MDComposer.tsx            ← write/preview tabs UI
+│   ├── MDCard.tsx                ← feed list item
+│   ├── RatingWidget.tsx          ← stars input + average display
+│   ├── CoworkerGradeBadge.tsx    ← per-user grade pill
+│   ├── TagPill.tsx
+│   ├── ShareDialog.tsx           ← direct share / cross-team share request
+│   ├── PendingApprovals.tsx      ← lead inbox section
+│   └── JoinRequestForm.tsx
+├── lib/
+│   ├── supabase/
+│   │   ├── client.ts             ← browser client
+│   │   └── server.ts             ← server client
+│   ├── types.ts                  ← TypeScript types matching schema
+│   └── utils.ts                  ← cn() helper for shadcn
+└── middleware.ts                 ← Supabase auth session refresh
+```
+
+---
+
+## TypeScript Types (must match schema exactly)
+
+```typescript
+// lib/types.ts
+
+export type UserRole       = 'member' | 'lead' | 'admin'
+export type MDTag          = 'skill' | 'rule' | 'prompt' | 'sop' | 'other'
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
+
+export interface Company {
+  id: string
+  name: string
+  slug: string
+  created_at: string
+}
+
+export interface Profile {
+  id: string
+  company_id: string | null
+  display_name: string
+  role: UserRole
+  created_at: string
+}
+
+export interface Team {
+  id: string
+  company_id: string
+  name: string
+  description: string | null
+  lead_id: string
+  created_at: string
+}
+
+export interface TeamMember {
+  id: string
+  team_id: string
+  user_id: string
+  joined_at: string
+}
+
+export interface MarkdownFile {
+  id: string
+  team_id: string
+  author_id: string
+  title: string
+  readme: string | null
+  content: string
+  tags: MDTag[]
+  created_at: string
+  updated_at: string
+}
+
+export interface MDTeamVisibility {
+  id: string
+  md_id: string
+  team_id: string
+  granted_at: string
+}
+
+export interface JoinRequest {
+  id: string
+  team_id: string
+  user_id: string
+  status: ApprovalStatus
+  message: string | null
+  resolved_at: string | null
+  created_at: string
+}
+
+export interface CrossTeamRequest {
+  id: string
+  md_id: string
+  from_team_id: string
+  to_team_id: string
+  requested_by: string
+  status: ApprovalStatus
+  resolved_at: string | null
+  created_at: string
+}
+
+export interface DirectShare {
+  id: string
+  md_id: string
+  sender_id: string
+  recipient_id: string
+  message: string | null
+  seen: boolean
+  created_at: string
+}
+
+export interface MDFeedback {
+  id: string
+  md_id: string
+  user_id: string
+  stars: 1 | 2 | 3 | 4 | 5
+  comment: string | null
+  created_at: string
+}
+
+export interface MDRatingSummary {
+  md_id: string
+  avg_stars: number
+  rating_count: number
+}
+
+export interface UserGrade {
+  user_id: string
+  display_name: string
+  company_id: string
+  coworker_grade: number
+  total_ratings: number
+  md_count: number
+}
+```
+
+---
+
+## What NEVER to Do
+
+- NEVER write auth middleware yourself — use Supabase Auth
+- NEVER store passwords — Supabase Auth handles it
+- NEVER use the service role key client-side
+- NEVER skip RLS by using service role for regular queries
+- NEVER render user-provided markdown without DOMPurify sanitization
+- NEVER use `useEffect` for data fetching in server components
+- NEVER use the `pages/` router — App Router only
+- NEVER store sensitive data in localStorage
+- NEVER commit `.env.local`
+- NEVER use Supabase Storage for MD content — content lives in the `content` TEXT column
+- NEVER add an `is_approved` flag to MDs — use `md_team_visibility` for cross-team grants
+- NEVER let a user rate their own MD (RLS already blocks this; UI must hide the control too)
+
+---
+
+## Hackathon Scope
+
+In v1 (must work for the demo):
+- Email + password auth (no OAuth, no magic link)
+- Company auto-bind by email domain (DB trigger)
+- Markdown content as TEXT (no Storage bucket)
+- Team feed, MD viewer (with Source toggle), MD composer (write/preview tabs)
+- Direct shares, cross-team share requests with lead approval
+- 1-5 star ratings + Coworker Grade
+- Local `next dev` only — no Vercel deploy needed
+
+Stretch (only if time allows):
+- Search across MDs (`pg_trgm` or `to_tsvector`)
+- Real-time updates via Supabase Realtime
+- MD version history / diffs
+- Threaded comments on MDs
+- Public-domain handling (multiple "companies" colliding on `gmail.com`)
+- Vercel deployment
+
+Known dev/demo limitations (acceptable):
+- Public email domains (gmail.com, outlook.com, etc.) collide into one
+  "company" — fine for the demo, document it
+- Race condition on simultaneous first signups from a new domain — fine,
+  the second insert will fail and the user can retry
+
+---
+
+## Prompt Templates for Cursor
+
+**New page/feature:**
+"Read .cursorrules, schema.sql, and rls-policies.sql.
+Build [feature] using Next.js App Router and Supabase.
+Use server components for data fetching.
+RLS handles authorization — do not add manual permission checks.
+TypeScript only, types from lib/types.ts.
+Use shadcn/ui components and lucide-react icons.
+Match the GitHub-inspired UI direction in .cursorrules."
+
+**Fixing a Supabase query:**
+"This query is for a [server component / client component / server action].
+Use the correct Supabase client for that context per .cursorrules.
+The schema is in schema.sql."
+
+**Debugging RLS:**
+"The query returns empty data. The RLS policies are in rls-policies.sql.
+Check whether `can_view_md()` (or the relevant helper) covers this case
+and confirm the user has the right team membership / role."
