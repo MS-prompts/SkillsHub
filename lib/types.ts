@@ -1,8 +1,25 @@
 export type UserRole = 'member' | 'lead' | 'admin'
-export type MDTag = 'skill' | 'rule' | 'prompt' | 'sop' | 'other'
+export type MDTag =
+  | 'agents'
+  | 'claude'
+  | 'cursor'
+  | 'skill'
+  | 'prompt'
+  | 'memory'
+  | 'context'
+  | 'other'
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 
-export const MD_TAGS: MDTag[] = ['skill', 'rule', 'prompt', 'sop', 'other']
+export const MD_TAGS: MDTag[] = [
+  'agents',
+  'claude',
+  'cursor',
+  'skill',
+  'prompt',
+  'memory',
+  'context',
+  'other',
+]
 
 export interface Company {
   id: string

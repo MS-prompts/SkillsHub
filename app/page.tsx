@@ -18,8 +18,9 @@ export default async function Home() {
       <section className="space-y-4 text-center">
         <h1 className="text-5xl font-bold tracking-tight">Share what your team knows.</h1>
         <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
-          SkillsHub is the markdown library for your company. Share AI prompts, skills, rules, and SOPs
-          with your team. Rate each other&apos;s work and build a Coworker Grade.
+          SkillsHub is the markdown library for your company. Share AGENTS.md, CLAUDE.md, Cursor
+          rules, prompts, and reusable skills with your team. Rate each other&apos;s work and build a
+          Coworker Grade.
         </p>
         <div className="flex justify-center gap-3">
           <Button asChild size="lg">

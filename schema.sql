@@ -21,7 +21,16 @@ CREATE EXTENSION IF NOT EXISTS "citext";   -- case-insensitive text for company 
 -- ============================================================
 
 CREATE TYPE user_role       AS ENUM ('member', 'lead', 'admin');
-CREATE TYPE md_tag          AS ENUM ('skill', 'rule', 'prompt', 'sop', 'other');
+CREATE TYPE md_tag          AS ENUM (
+  'agents',
+  'claude',
+  'cursor',
+  'skill',
+  'prompt',
+  'memory',
+  'context',
+  'other'
+);
 CREATE TYPE approval_status AS ENUM ('pending', 'approved', 'rejected');
 
 
