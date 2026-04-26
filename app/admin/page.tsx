@@ -35,12 +35,18 @@ export default async function AdminPage() {
     .order('name')
 
   const userList = (users ?? []) as Array<{ id: string; display_name: string; role: string }>
-  const teamList = (teams ?? []) as Array<{
+
+  const rawTeams = (teams ?? []) as Array<{
     id: string
     name: string
     description: string | null
-    lead: { display_name: string } | null
+    lead: Array<{ display_name: string }> | { display_name: string } | null
   }>
+
+  const teamList = rawTeams.map((team) => ({
+    ...team,
+    lead: Array.isArray(team.lead) ? (team.lead[0] ?? null) : team.lead,
+  }))
 
   return (
     <div className="space-y-8">
