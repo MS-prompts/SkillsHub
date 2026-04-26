@@ -249,6 +249,7 @@ CREATE TABLE md_feedback (
   user_id     UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   stars       SMALLINT NOT NULL CHECK (stars BETWEEN 1 AND 5),
   comment     TEXT,
+  author_seen BOOLEAN NOT NULL DEFAULT FALSE,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(md_id, user_id)
 );
@@ -301,3 +302,4 @@ CREATE INDEX idx_cross_team_requests_to_team   ON cross_team_requests(to_team_id
 CREATE INDEX idx_direct_shares_recipient       ON direct_shares(recipient_id) WHERE seen = FALSE;
 CREATE INDEX idx_md_feedback_md_id             ON md_feedback(md_id);
 CREATE INDEX idx_md_feedback_user_id           ON md_feedback(user_id);
+CREATE INDEX idx_md_feedback_author_seen_false ON md_feedback(author_seen) WHERE author_seen = FALSE;

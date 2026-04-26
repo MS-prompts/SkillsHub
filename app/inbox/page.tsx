@@ -10,6 +10,7 @@ import {
   type PendingCrossTeam,
 } from '@/components/PendingApprovals'
 import { MarkSeenButton } from './MarkSeenButton'
+import { MarkFeedbackSeenButton } from './MarkFeedbackSeenButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,6 +29,26 @@ export default async function InboxPage() {
     )
     .eq('recipient_id', user.id)
     .order('created_at', { ascending: false })
+
+  const { data: myMds } = await supabase
+    .from('markdown_files')
+    .select('id, title')
+    .eq('author_id', user.id)
+
+  const myMdIds = (myMds ?? []).map((m) => m.id)
+  const mdTitles = new Map((myMds ?? []).map((m) => [m.id, m.title]))
+  const { data: ratingNotifications } =
+    myMdIds.length > 0
+      ? await supabase
+          .from('md_feedback')
+          .select(
+            `id, md_id, stars, comment, author_seen, created_at,
+             rater:profiles!md_feedback_user_id_fkey(id, display_name)`
+          )
+          .in('md_id', myMdIds)
+          .neq('user_id', user.id)
+          .order('created_at', { ascending: false })
+      : { data: [] as any[] }
 
   const { data: ledTeams } = await supabase
     .from('teams')
@@ -108,6 +129,42 @@ export default async function InboxPage() {
                     {s.message && <p className="mt-1 text-sm">{s.message}</p>}
                   </div>
                   {!s.seen && <MarkSeenButton id={s.id} />}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Ratings on your MDs</h2>
+        {(ratingNotifications ?? []).length === 0 ? (
+          <Card>
+            <CardContent className="p-6 text-sm text-muted-foreground">
+              No ratings yet.
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="divide-y p-0">
+              {(ratingNotifications ?? []).map((r: any) => (
+                <div
+                  key={r.id}
+                  className={`flex items-start justify-between gap-3 p-4 ${
+                    !r.author_seen ? 'bg-accent/40' : ''
+                  }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <Link href={`/md/${r.md_id}`} className="font-medium hover:underline">
+                      {mdTitles.get(r.md_id) ?? 'your markdown'}
+                    </Link>
+                    <div className="text-sm text-muted-foreground">
+                      rated {r.stars}/5 by {r.rater?.display_name ?? 'someone'} ·{' '}
+                      {formatRelativeTime(r.created_at)}
+                    </div>
+                    {r.comment && <p className="mt-1 text-sm">{r.comment}</p>}
+                  </div>
+                  {!r.author_seen && <MarkFeedbackSeenButton id={r.id} />}
                 </div>
               ))}
             </CardContent>

@@ -14,14 +14,10 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { TopBarNav } from '@/components/TopBarNav'
 
-async function getInboxCount(userId: string): Promise<number> {
+async function getInboxCount(): Promise<number> {
   const supabase = createClient()
-  const { count } = await supabase
-    .from('direct_shares')
-    .select('id', { count: 'exact', head: true })
-    .eq('recipient_id', userId)
-    .eq('seen', false)
-  return count ?? 0
+  const { data } = await supabase.rpc('inbox_unread_count')
+  return (data as number) ?? 0
 }
 
 export async function TopBar() {
@@ -41,7 +37,7 @@ export async function TopBar() {
       .single()
     displayName = profile?.display_name ?? user.email ?? ''
     isAdmin = profile?.role === 'admin'
-    inboxCount = await getInboxCount(user.id)
+    inboxCount = await getInboxCount()
   }
 
   const initials = displayName

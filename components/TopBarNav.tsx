@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Inbox, LayoutGrid, Shield, Users } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -42,13 +41,13 @@ export function TopBarNav({ inboxCount, isAdmin }: TopBarNavProps) {
       </Button>
       <Button asChild variant="ghost" size="sm" className={navButtonClass(isActive(pathname, '/inbox'))}>
         <Link href="/inbox" className="relative">
-          <Inbox className="mr-2 h-4 w-4" />
+          <span className="relative mr-2 inline-flex">
+            <Inbox className="h-4 w-4" />
+            {inboxCount > 0 && (
+              <span className="absolute -right-1 -top-1 h-1.5 w-1.5 rounded-full bg-foreground" />
+            )}
+          </span>
           Inbox
-          {inboxCount > 0 && (
-            <Badge variant="destructive" className="ml-2 h-5 px-1.5">
-              {inboxCount}
-            </Badge>
-          )}
         </Link>
       </Button>
       {isAdmin && (

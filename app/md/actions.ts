@@ -160,6 +160,7 @@ export async function rateMD(formData: FormData): Promise<Result> {
       user_id: user.id,
       stars: parsed.data.stars,
       comment: parsed.data.comment ?? null,
+      author_seen: false,
     },
     { onConflict: 'md_id,user_id' }
   )
@@ -284,6 +285,22 @@ export async function markDirectShareSeen(formData: FormData): Promise<Result> {
   const { error } = await supabase
     .from('direct_shares')
     .update({ seen: true })
+    .eq('id', parsed.data.id)
+  if (error) return { error: error.message }
+
+  revalidatePath('/inbox')
+  revalidatePath('/', 'layout')
+  return { ok: true }
+}
+
+export async function markFeedbackSeen(formData: FormData): Promise<Result> {
+  const parsed = MarkSeenSchema.safeParse(Object.fromEntries(formData))
+  if (!parsed.success) return { error: 'Invalid request.' }
+
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('md_feedback')
+    .update({ author_seen: true })
     .eq('id', parsed.data.id)
   if (error) return { error: error.message }
 

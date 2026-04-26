@@ -62,6 +62,28 @@ RETURNS BOOLEAN AS $$
   SELECT role = 'admin' FROM profiles WHERE id = auth.uid();
 $$ LANGUAGE SQL SECURITY DEFINER STABLE;
 
+CREATE OR REPLACE FUNCTION inbox_unread_count()
+RETURNS BIGINT AS $$
+  SELECT (
+    SELECT COUNT(*) FROM direct_shares
+    WHERE recipient_id = auth.uid() AND seen = false
+  ) + (
+    SELECT COUNT(*) FROM join_requests
+    WHERE team_id IN (SELECT id FROM teams WHERE lead_id = auth.uid())
+      AND status = 'pending'
+  ) + (
+    SELECT COUNT(*) FROM cross_team_requests
+    WHERE to_team_id IN (SELECT id FROM teams WHERE lead_id = auth.uid())
+      AND status = 'pending'
+  ) + (
+    SELECT COUNT(*) FROM md_feedback f
+    JOIN markdown_files m ON m.id = f.md_id
+    WHERE m.author_id = auth.uid()
+      AND f.user_id <> auth.uid()
+      AND f.author_seen = false
+  )
+$$ LANGUAGE SQL SECURITY DEFINER STABLE;
+
 -- Centralized "can the current user view this MD?" check.
 -- True if admin, OR owning team member, OR MD shared into one of
 -- my teams via md_team_visibility, OR direct-shared to me.
@@ -332,7 +354,14 @@ WITH CHECK (
 -- You can edit only your own rating.
 CREATE POLICY "update_own_feedback"
 ON md_feedback FOR UPDATE
-USING (user_id = auth.uid());
+USING (
+  user_id = auth.uid()
+  OR EXISTS (
+    SELECT 1 FROM markdown_files m
+    WHERE m.id = md_feedback.md_id
+      AND m.author_id = auth.uid()
+  )
+);
 
 -- You can delete only your own rating.
 CREATE POLICY "delete_own_feedback"
