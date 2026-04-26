@@ -49,7 +49,7 @@ export default async function Home() {
             <Users className="h-6 w-6 text-muted-foreground" />
             <h3 className="font-semibold">Team-scoped feeds</h3>
             <p className="text-sm text-muted-foreground">
-              Auto-bind to your company by email domain. Cross-team shares require lead approval.
+              Auto-bind to your company by email domain. Prompt requests require lead approval.
             </p>
           </CardContent>
         </Card>

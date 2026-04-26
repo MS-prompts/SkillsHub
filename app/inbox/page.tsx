@@ -9,8 +9,6 @@ import {
   type PendingJoin,
   type PendingCrossTeam,
 } from '@/components/PendingApprovals'
-import { MarkSeenButton } from './MarkSeenButton'
-import { MarkFeedbackSeenButton } from './MarkFeedbackSeenButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +18,13 @@ export default async function InboxPage() {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
+
+  // Opening inbox marks incoming notifications as seen.
+  await supabase
+    .from('direct_shares')
+    .update({ seen: true })
+    .eq('recipient_id', user.id)
+    .eq('seen', false)
 
   const { data: shares } = await supabase
     .from('direct_shares')
@@ -49,6 +54,15 @@ export default async function InboxPage() {
           .neq('user_id', user.id)
           .order('created_at', { ascending: false })
       : { data: [] as any[] }
+
+  if (myMdIds.length > 0) {
+    await supabase
+      .from('md_feedback')
+      .update({ author_seen: true })
+      .in('md_id', myMdIds)
+      .neq('user_id', user.id)
+      .eq('author_seen', false)
+  }
 
   const { data: ledTeams } = await supabase
     .from('teams')
@@ -100,6 +114,7 @@ export default async function InboxPage() {
       )
       .in('to_team_id', effectiveTeamIds)
       .eq('status', 'pending')
+      .neq('requested_by', user.id)
       .order('created_at', { ascending: false })
     crossReqs = (ctrs ?? []) as any
   }
@@ -112,6 +127,13 @@ export default async function InboxPage() {
           Inbox
         </h1>
       </div>
+
+      {shouldShowApprovals && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">Pending approvals</h2>
+          <PendingApprovals joinRequests={joinReqs} crossTeamRequests={crossReqs} />
+        </section>
+      )}
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Direct shares</h2>
@@ -144,7 +166,6 @@ export default async function InboxPage() {
                     </div>
                     {s.message && <p className="mt-1 text-sm">{s.message}</p>}
                   </div>
-                  {!s.seen && <MarkSeenButton id={s.id} />}
                 </div>
               ))}
             </CardContent>
@@ -180,7 +201,6 @@ export default async function InboxPage() {
                     </div>
                     {r.comment && <p className="mt-1 text-sm">{r.comment}</p>}
                   </div>
-                  {!r.author_seen && <MarkFeedbackSeenButton id={r.id} />}
                 </div>
               ))}
             </CardContent>
@@ -188,12 +208,6 @@ export default async function InboxPage() {
         )}
       </section>
 
-      {shouldShowApprovals && (
-        <section className="space-y-3">
-          <h2 className="text-lg font-semibold">Pending approvals</h2>
-          <PendingApprovals joinRequests={joinReqs} crossTeamRequests={crossReqs} />
-        </section>
-      )}
     </div>
   )
 }

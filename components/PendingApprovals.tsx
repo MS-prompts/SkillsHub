@@ -1,11 +1,10 @@
 'use client'
 
 import { useTransition } from 'react'
-import { Check, X } from 'lucide-react'
+import { Check, Share2, X } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Separator } from '@/components/ui/separator'
 import { resolveJoinRequest } from '@/app/teams/actions'
 import { resolveCrossTeamRequest } from '@/app/md/actions'
 import { formatRelativeTime } from '@/lib/utils'
@@ -105,38 +104,17 @@ export function PendingApprovals({
   }
 
   return (
-    <Card>
-      <CardContent className="p-4">
-        {joinRequests.length > 0 && (
-          <div>
-            <h3 className="px-2 text-sm font-semibold">Join requests</h3>
-            <div className="divide-y">
-              {joinRequests.map((r) => (
-                <div key={r.id} className="px-2">
-                  <ApprovalRow
-                    title={
-                      <>
-                        {r.user?.display_name ?? 'Someone'} wants to join{' '}
-                        {r.team?.name ?? 'your team'}
-                      </>
-                    }
-                    subtitle={r.message ?? undefined}
-                    meta={formatRelativeTime(r.created_at)}
-                    onApprove={() => handleJoin(r.id, true)}
-                    onReject={() => handleJoin(r.id, false)}
-                    pending={pending}
-                  />
-                </div>
-              ))}
+    <div className="space-y-3">
+      {crossTeamRequests.length > 0 && (
+        <Card className="border-amber-300 dark:border-amber-700">
+          <CardContent className="p-4">
+            <div className="mb-1 flex items-center gap-2 px-2">
+              <Share2 className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+              <h3 className="text-sm font-semibold">Prompt requests</h3>
+              <span className="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-semibold leading-none text-white">
+                {crossTeamRequests.length}
+              </span>
             </div>
-          </div>
-        )}
-
-        {joinRequests.length > 0 && crossTeamRequests.length > 0 && <Separator className="my-2" />}
-
-        {crossTeamRequests.length > 0 && (
-          <div>
-            <h3 className="px-2 text-sm font-semibold">Cross-team share requests</h3>
             <div className="divide-y">
               {crossTeamRequests.map((r) => (
                 <div key={r.id} className="px-2">
@@ -159,9 +137,36 @@ export function PendingApprovals({
                 </div>
               ))}
             </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          </CardContent>
+        </Card>
+      )}
+
+      {joinRequests.length > 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <h3 className="px-2 text-sm font-semibold">Join requests</h3>
+            <div className="divide-y">
+              {joinRequests.map((r) => (
+                <div key={r.id} className="px-2">
+                  <ApprovalRow
+                    title={
+                      <>
+                        {r.user?.display_name ?? 'Someone'} wants to join{' '}
+                        {r.team?.name ?? 'your team'}
+                      </>
+                    }
+                    subtitle={r.message ?? undefined}
+                    meta={formatRelativeTime(r.created_at)}
+                    onApprove={() => handleJoin(r.id, true)}
+                    onReject={() => handleJoin(r.id, false)}
+                    pending={pending}
+                  />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   )
 }

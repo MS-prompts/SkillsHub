@@ -112,13 +112,13 @@ export function ShareDialog({ mdId, fromTeamId, coworkers, otherTeams }: Props) 
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Share this MD</DialogTitle>
-          <DialogDescription>Send to a coworker or request a cross-team share.</DialogDescription>
+          <DialogDescription>Send to a coworker or create a prompt request.</DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="direct">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="direct">Direct share</TabsTrigger>
-            <TabsTrigger value="cross">Cross-team</TabsTrigger>
+            <TabsTrigger value="cross">Prompt request</TabsTrigger>
           </TabsList>
 
           <TabsContent value="direct" className="space-y-3">
@@ -171,7 +171,7 @@ export function ShareDialog({ mdId, fromTeamId, coworkers, otherTeams }: Props) 
               The target team&apos;s lead must approve before they can see it.
             </p>
             <Button onClick={submitCrossTeam} disabled={pending} className="w-full">
-              {pending ? 'Sending…' : 'Request share'}
+              {pending ? 'Sending…' : 'Create prompt request'}
             </Button>
           </TabsContent>
         </Tabs>

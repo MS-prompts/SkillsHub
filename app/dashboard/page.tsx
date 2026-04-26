@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowRight, PlusCircle, Users } from 'lucide-react'
+import { ArrowRight, PlusCircle, Share2, Users } from 'lucide-react'
 import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
@@ -34,6 +34,32 @@ export default async function DashboardPage({
     .from('team_members')
     .select('team:teams(id, name, description)')
     .eq('user_id', user.id)
+
+  const isAdmin = (profile as any)?.role === 'admin'
+
+  // Fetch pending prompt request count for leads/admins.
+  let promptRequestCount = 0
+  const { data: ledTeams } = await supabase
+    .from('teams')
+    .select('id')
+    .eq('lead_id', user.id)
+  const ledTeamIds = (ledTeams ?? []).map((t) => t.id)
+  if (ledTeamIds.length > 0 || isAdmin) {
+    let effectiveTeamIds = ledTeamIds
+    if (isAdmin) {
+      const { data: allTeams } = await supabase.from('teams').select('id')
+      effectiveTeamIds = (allTeams ?? []).map((t) => t.id)
+    }
+    if (effectiveTeamIds.length > 0) {
+      const { count } = await supabase
+        .from('cross_team_requests')
+        .select('id', { count: 'exact', head: true })
+        .in('to_team_id', effectiveTeamIds)
+        .eq('status', 'pending')
+        .neq('requested_by', user.id)
+      promptRequestCount = count ?? 0
+    }
+  }
 
   const myTeams =
     (memberships ?? [])
@@ -135,6 +161,21 @@ export default async function DashboardPage({
         </div>
 
         <aside className="space-y-3">
+          {promptRequestCount > 0 && (
+            <Link href="/inbox">
+              <Card className="border-amber-300 transition-colors hover:bg-amber-50/60 dark:border-amber-700 dark:hover:bg-amber-950/20">
+                <CardContent className="flex items-center justify-between p-4">
+                  <div className="flex items-center gap-2">
+                    <Share2 className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    <span className="text-sm font-medium">Prompt requests</span>
+                  </div>
+                  <span className="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-semibold leading-none text-white">
+                    {promptRequestCount}
+                  </span>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
