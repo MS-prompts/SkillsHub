@@ -43,7 +43,7 @@ export function TopBarNav({ inboxCount, isAdmin }: TopBarNavProps) {
         <Link href="/inbox" className="relative">
           <span className="relative mr-2 inline-flex">
             <Inbox className="h-4 w-4" />
-            {inboxCount > 0 && !isActive(pathname, '/inbox') && (
+            {inboxCount > 0 && (
               <span className="absolute -right-1 -top-1 h-1.5 w-1.5 rounded-full bg-foreground" />
             )}
           </span>

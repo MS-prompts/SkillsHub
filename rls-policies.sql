@@ -68,14 +68,6 @@ RETURNS BIGINT AS $$
     SELECT COUNT(*) FROM direct_shares
     WHERE recipient_id = auth.uid() AND seen = false
   ) + (
-    SELECT COUNT(*) FROM join_requests
-    WHERE team_id IN (SELECT id FROM teams WHERE lead_id = auth.uid())
-      AND status = 'pending'
-  ) + (
-    SELECT COUNT(*) FROM cross_team_requests
-    WHERE to_team_id IN (SELECT id FROM teams WHERE lead_id = auth.uid())
-      AND status = 'pending'
-  ) + (
     SELECT COUNT(*) FROM md_feedback f
     JOIN markdown_files m ON m.id = f.md_id
     WHERE m.author_id = auth.uid()

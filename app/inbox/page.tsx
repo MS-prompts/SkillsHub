@@ -9,6 +9,7 @@ import {
   type PendingJoin,
   type PendingCrossTeam,
 } from '@/components/PendingApprovals'
+import { RefreshOnMount } from './RefreshOnMount'
 
 export const dynamic = 'force-dynamic'
 
@@ -121,6 +122,7 @@ export default async function InboxPage() {
 
   return (
     <div className="space-y-8">
+      <RefreshOnMount />
       <div>
         <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight">
           <InboxIcon className="h-7 w-7" />
