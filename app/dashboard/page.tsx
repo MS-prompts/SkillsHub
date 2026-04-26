@@ -1,20 +1,28 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { ArrowRight, PlusCircle, Users } from 'lucide-react'
+import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { MDCard, type MDCardData } from '@/components/MDCard'
+import { SearchInput } from '@/components/SearchInput'
 import type { MDTag } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: { q?: string }
+}) {
   const supabase = createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
+
+  const q = (searchParams.q ?? '').trim().toLowerCase()
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -36,7 +44,7 @@ export default async function DashboardPage() {
 
   let recent: MDCardData[] = []
   if (teamIds.length > 0) {
-    const { data: mds } = await supabase
+    let query = supabase
       .from('markdown_files')
       .select(
         `id, team_id, title, readme, tags, updated_at, author_id,
@@ -45,7 +53,12 @@ export default async function DashboardPage() {
       )
       .in('team_id', teamIds)
       .order('updated_at', { ascending: false })
-      .limit(10)
+
+    if (q) {
+      query = query.or(`title.ilike.%${q}%,readme.ilike.%${q}%`)
+    }
+
+    const { data: mds } = await query.limit(20)
 
     const mdIds = (mds ?? []).map((m) => m.id)
     const authorIds = Array.from(new Set((mds ?? []).map((m) => m.author_id)))
@@ -97,12 +110,19 @@ export default async function DashboardPage() {
       </div>
 
       <section className="grid gap-6 md:grid-cols-[1fr_320px]">
-        <div className="space-y-3">
-          <h2 className="text-lg font-semibold">Recent across your teams</h2>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <h2 className="shrink-0 text-lg font-semibold">
+              {q ? 'Search results' : 'Recent across your teams'}
+            </h2>
+            <Suspense>
+              <SearchInput />
+            </Suspense>
+          </div>
           {recent.length === 0 ? (
             <Card>
               <CardContent className="p-6 text-sm text-muted-foreground">
-                No MDs yet. Join a team or write your first one.
+                {q ? `No markdowns found for "${q}".` : 'No MDs yet. Join a team or write your first one.'}
               </CardContent>
             </Card>
           ) : (
