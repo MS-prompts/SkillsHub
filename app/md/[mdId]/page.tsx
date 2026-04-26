@@ -198,9 +198,9 @@ export default async function MDViewPage({ params }: { params: { mdId: string } 
       </header>
 
       <div className="grid gap-6 md:grid-cols-[1fr_320px]">
-        <Card>
+        <Card className="min-w-0">
           <CardContent className="p-6">
-            <SourceToggle content={md.content} />
+            <SourceToggle content={md.content} title={md.title} />
           </CardContent>
         </Card>
 
