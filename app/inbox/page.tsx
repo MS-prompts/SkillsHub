@@ -57,10 +57,26 @@ export default async function InboxPage() {
   const isAnyLead = (ledTeams ?? []).length > 0
   const ledTeamIds = (ledTeams ?? []).map((t) => t.id)
 
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+  const isAdmin = profile?.role === 'admin'
+
+  // Admins see all company teams; leads only see their led teams.
+  let effectiveTeamIds = ledTeamIds
+  if (isAdmin) {
+    const { data: allTeams } = await supabase.from('teams').select('id')
+    effectiveTeamIds = (allTeams ?? []).map((t) => t.id)
+  }
+
+  const shouldShowApprovals = isAnyLead || isAdmin
+
   let joinReqs: PendingJoin[] = []
   let crossReqs: PendingCrossTeam[] = []
 
-  if (isAnyLead) {
+  if (shouldShowApprovals && effectiveTeamIds.length > 0) {
     const { data: jrs } = await supabase
       .from('join_requests')
       .select(
@@ -68,7 +84,7 @@ export default async function InboxPage() {
          team:teams(id, name),
          user:profiles(id, display_name)`
       )
-      .in('team_id', ledTeamIds)
+      .in('team_id', effectiveTeamIds)
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
     joinReqs = (jrs ?? []) as any
@@ -82,7 +98,7 @@ export default async function InboxPage() {
          to_team:teams!cross_team_requests_to_team_id_fkey(id, name),
          requester:profiles!cross_team_requests_requested_by_fkey(id, display_name)`
       )
-      .in('to_team_id', ledTeamIds)
+      .in('to_team_id', effectiveTeamIds)
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
     crossReqs = (ctrs ?? []) as any
@@ -172,7 +188,7 @@ export default async function InboxPage() {
         )}
       </section>
 
-      {isAnyLead && (
+      {shouldShowApprovals && (
         <section className="space-y-3">
           <h2 className="text-lg font-semibold">Pending approvals</h2>
           <PendingApprovals joinRequests={joinReqs} crossTeamRequests={crossReqs} />
