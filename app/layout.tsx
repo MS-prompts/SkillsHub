@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import 'highlight.js/styles/github.css'
 import { TopBar } from '@/components/TopBar'
+import { ThemeProvider } from '@/components/ThemeProvider'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -19,8 +20,10 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <TopBar />
-        <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <TopBar />
+          <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
+        </ThemeProvider>
       </body>
     </html>
   )

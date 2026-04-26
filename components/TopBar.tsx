@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { TopBarNav } from '@/components/TopBarNav'
+import { ThemeToggleItem } from '@/components/ThemeToggleItem'
 
 async function getInboxCount(): Promise<number> {
   const supabase = createClient()
@@ -79,6 +80,8 @@ export async function TopBar() {
               <DropdownMenuItem asChild>
                 <Link href={`/u/${user.id}`}>My profile</Link>
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <ThemeToggleItem />
               <DropdownMenuSeparator />
               <form action={signOut}>
                 <button type="submit" className="w-full">
