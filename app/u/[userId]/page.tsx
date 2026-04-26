@@ -107,7 +107,7 @@ export default async function UserProfilePage({ params }: { params: { userId: st
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="flex flex-col gap-1">
             {cards.map((md) => (
               <MDCard key={md.id} md={md} />
             ))}

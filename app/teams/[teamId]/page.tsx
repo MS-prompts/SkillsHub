@@ -191,7 +191,7 @@ export default async function TeamPage({ params, searchParams }: Props) {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="flex flex-col gap-1">
           {cards.map((md) => (
             <MDCard key={md.id} md={md} />
           ))}

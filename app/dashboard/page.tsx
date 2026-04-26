@@ -152,7 +152,7 @@ export default async function DashboardPage({
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-1">
               {recent.map((md) => (
                 <MDCard key={md.id} md={md} />
               ))}
